@@ -5,6 +5,7 @@ These are notable changes in edx-platform.  This is a rolling list of changes,
 in roughly chronological order, most recent first.  Add your entries at or near
 the top.  Include a label indicating the component affected.
 
+<<<<<<< HEAD
 LMS: Add a user-visible alert modal when a forums AJAX request fails.
 
 Blades: Add template for checkboxes response to studio. BLD-193.
@@ -25,6 +26,8 @@ LMS: Beta instructor dashboard will only count actively enrolled students for
 course enrollment numbers.
 
 Blades: Fix speed menu that is not rendered correctly when YouTube is unavailable. (BLD-457).
+=======
+Blades: Make LTI passports to be in InheritanceMixin. (BLD-501)
 
 LMS: Users with is_staff=True no longer have the STAFF label appear on
 their forum posts.
