@@ -20,7 +20,7 @@ from models.settings.course_metadata import CourseMetadata
 from xmodule.fields import Date
 
 from .utils import CourseTestCase
-from xmodule.modulestore.django import loc_mapper
+from xmodule.modulestore.django import loc_mapper, modulestore
 
 
 class CourseDetailsTestCase(CourseTestCase):
@@ -418,15 +418,15 @@ class CourseMetadataEditingTest(CourseTestCase):
     """
     def setUp(self):
         CourseTestCase.setUp(self)
-        CourseFactory.create(org='edX', course='999', display_name='Robot Super Course')
+        self.fullcourse = CourseFactory.create(org='edX', course='999', display_name='Robot Super Course')
         self.fullcourse_location = Location(['i4x', 'edX', '999', 'course', 'Robot_Super_Course', None])
 
     def test_fetch_initial_fields(self):
-        test_model = CourseMetadata.fetch(self.course.location)
+        test_model = CourseMetadata.fetch(self.course)
         self.assertIn('display_name', test_model, 'Missing editable metadata field')
         self.assertEqual(test_model['display_name'], 'Robot Super Course', "not expected value")
 
-        test_model = CourseMetadata.fetch(self.fullcourse_location)
+        test_model = CourseMetadata.fetch(self.fullcourse)
         self.assertNotIn('graceperiod', test_model, 'blacklisted field leaked in')
         self.assertIn('display_name', test_model, 'full missing editable metadata field')
         self.assertEqual(test_model['display_name'], 'Robot Super Course', "not expected value")
@@ -435,17 +435,18 @@ class CourseMetadataEditingTest(CourseTestCase):
         self.assertIn('xqa_key', test_model, 'xqa_key field ')
 
     def test_update_from_json(self):
-        test_model = CourseMetadata.update_from_json(self.course.location, {
+        test_model = CourseMetadata.update_from_json(self.course, {
             "advertised_start": "start A",
             "testcenter_info": {"c": "test"},
             "days_early_for_beta": 2
         })
         self.update_check(test_model)
         # try fresh fetch to ensure persistence
-        test_model = CourseMetadata.fetch(self.course.location)
+        fresh = modulestore().get_item(self.course_location)
+        test_model = CourseMetadata.fetch(fresh)
         self.update_check(test_model)
         # now change some of the existing metadata
-        test_model = CourseMetadata.update_from_json(self.course.location, {
+        test_model = CourseMetadata.update_from_json(fresh, {
             "advertised_start": "start B",
             "display_name": "jolly roger"}
         )
@@ -465,7 +466,9 @@ class CourseMetadataEditingTest(CourseTestCase):
         self.assertEqual(test_model['days_early_for_beta'], 2, "days_early_for_beta not expected value")
 
     def test_delete_key(self):
-        test_model = CourseMetadata.delete_key(self.fullcourse_location, {'deleteKeys': ['doesnt_exist', 'showanswer', 'xqa_key']})
+        test_model = CourseMetadata.delete_key(
+            self.fullcourse, {'deleteKeys': ['doesnt_exist', 'showanswer', 'xqa_key']}
+        )
         # ensure no harm
         self.assertNotIn('graceperiod', test_model, 'blacklisted field leaked in')
         self.assertIn('display_name', test_model, 'full missing editable metadata field')

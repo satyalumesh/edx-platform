@@ -1657,15 +1657,7 @@ class ContentStoreTest(ModuleStoreTestCase):
         test_get_html('tabs')
         test_get_html('settings/details')
         test_get_html('settings/grading')
-
-        # advanced settings
-        resp = self.client.get_html(reverse('course_advanced_settings',
-                                            kwargs={'org': loc.org,
-                                                    'course': loc.course,
-                                                    'name': loc.name}))
-        self.assertEqual(resp.status_code, 200)
-        # TODO: uncomment when advanced settings not using old locations.
-        # _test_no_locations(self, resp)
+        test_get_html('settings/advanced')
 
         # textbook index
         resp = self.client.get_html(reverse('textbook_index',
@@ -2034,6 +2026,6 @@ def _test_no_locations(test, resp, status_code=200, html=True):
         # in JavaScript blocks.
         content = resp.content
         num_jump_to = len(re.findall(r"8000(\S)*jump_to/i4x", content))
-        total_i4x = len(re.findall(r"i4x", content))
+        total_i4x = len(re.findall(r"i4x://", content))
 
         test.assertEqual(total_i4x - num_jump_to, 0, "i4x found outside of LMS jump-to links")
