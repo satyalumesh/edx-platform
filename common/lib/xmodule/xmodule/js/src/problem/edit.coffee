@@ -4,6 +4,7 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
   @checkboxChoiceTemplate: "[x] correct\n[ ] incorrect\n[x] correct\n"
   @stringInputTemplate: "= answer\n"
   @numberInputTemplate: "= answer +- x%\n"
+  @mathInputTemplate: "= \\(answer\\)\n"
   @selectTemplate: "[[incorrect, (correct), incorrect]]\n"
   @headerTemplate: "Header\n=====\n"
   @explanationTemplate: "[explanation]\nShort explanation\n[explanation]\n"
@@ -75,6 +76,7 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
       when "multiple-choice-button" then revisedSelection = MarkdownEditingDescriptor.insertMultipleChoice(selection)
       when "string-button" then revisedSelection = MarkdownEditingDescriptor.insertStringInput(selection)
       when "number-button" then revisedSelection = MarkdownEditingDescriptor.insertNumberInput(selection)
+      when "math-button" then revisedSelection = MarkdownEditingDescriptor.insertMathInput(selection)
       when "checks-button" then revisedSelection = MarkdownEditingDescriptor.insertCheckboxChoice(selection)
       when "dropdown-button" then revisedSelection = MarkdownEditingDescriptor.insertSelect(selection)
       when "header-button" then revisedSelection = MarkdownEditingDescriptor.insertHeader(selection)
@@ -159,6 +161,9 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
   @insertNumberInput: (selectedText) ->
     return MarkdownEditingDescriptor.insertGenericInput(selectedText, '= ', '', MarkdownEditingDescriptor.numberInputTemplate)
 
+  @insertMathInput: (selectedText) ->
+    return MarkdownEditingDescriptor.insertGenericInput(selectedText, '= ', '', MarkdownEditingDescriptor.mathInputTemplate)
+
   @insertSelect: (selectedText) ->
     return MarkdownEditingDescriptor.insertGenericInput(selectedText, '[[', ']]', MarkdownEditingDescriptor.selectTemplate)
 
@@ -230,10 +235,25 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
       // replace string and numerical
       xml = xml.replace(/(^\=\s*(.*?$)(\n*or\=\s*(.*?$))*)+/gm, function(match, p) {
         var string,
+            mathRegExp = /^\\\((.*)\\\)$/, // Catch \( ... \)
             answersList = p.replace(/^(or)?=\s*/gm, '').split('\n'),
-            floatValue = parseFloat(answersList[0]);
+            floatValue = parseFloat(answersList[0]),
+            mathValue = mathRegExp.exec(answersList[0].trim());
 
+        // Returns ranges for formularesponse.
+        // If len = 3, it returns string '-10,-10,-10:10,10,10'.
+        var getRanges = function(len) {
+          var start = [], end = [];
+          while (len--) {
+            start.push('-10');
+            end.push('10');
+          }
+
+          return start.join(',') + ':' + end.join(',')
+        };
         if(!isNaN(floatValue)) {
+          // NumericalResponse
+
           var params = /(.*?)\+\-\s*(.*?$)/.exec(answersList[0]);
           if(params) {
             string = '<numericalresponse answer="' + floatValue + '">\n';
@@ -243,7 +263,21 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
           }
           string += '  <formulaequationinput />\n';
           string += '</numericalresponse>\n\n';
+
+        } else if(mathValue) {
+          var answer = mathValue[1],
+              varsRegExp = /[A-Za-z_]+\d*/g,
+              varsList = answer.match(varsRegExp),
+              ranges = getRanges(varsList.length);
+
+          string = '<formularesponse type="ci" samples="' + varsList.join(',') + '@' + ranges + '#10" answer="' + answer + '">\n'
+          string += '  <responseparam type="tolerance" default="0.00001"/>\n'
+          string += '  <formulaequationinput size="40" />\n'
+          string += '</formularesponse>\n\n'
+
         } else {
+            // StringResponse
+
             var answers = [];
 
             for(var i = 0; i < answersList.length; i++) {

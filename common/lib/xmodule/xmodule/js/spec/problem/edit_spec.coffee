@@ -309,6 +309,69 @@ describe 'MarkdownEditingDescriptor', ->
         </div>
         </solution>
         </problem>""")
+
+
+    it 'converts FormulaResponse to xml', ->
+
+      caseDict = [
+        {
+          markdown: '''= \\(a + b\\)'''
+          answer: 'a + b',
+          samples: 'a,b@-10,-10:10,10#10'
+        },
+        {
+          markdown: '''= \\(m*c^2\\)'''
+          answer: 'm*c^2',
+          samples: 'm,c@-10,-10:10,10#10'
+        },
+        {
+          markdown: '''= \\((R_1*R_2)/R_3\\)'''
+          answer: '(R_1*R_2)/R_3',
+          samples: 'R_1,R_2,R_3@-10,-10,-10:10,10,10#10'
+        },
+        {
+          markdown: '''= \\(x^2 + 2*x*y + y^2\\)'''
+          answer: 'x^2 + 2*x*y + y^2',
+          samples: 'x,x,y,y@-10,-10,-10,-10:10,10,10,10#10'
+        }
+      ]
+
+      $.each caseDict, (index, data) =>
+        markdown = data.markdown
+        samples = data.samples
+        answer = data.answer
+
+        markdown = """Test description
+
+          #{markdown}
+
+          [Explanation]
+          Test explanation.
+          [Explanation]
+        """
+
+        xml = """<problem>
+          <p>Test description</p>
+
+          <formularesponse type="ci" samples="#{samples}" answer="#{answer}">
+            <responseparam type="tolerance" default="0.00001"/>
+            <formulaequationinput size="40" />
+          </formularesponse>
+
+          <solution>
+          <div class="detailed-solution">
+          <p>Explanation</p>
+
+          <p>Test explanation.</p>
+
+          </div>
+          </solution>
+          </problem>"""
+
+        result = MarkdownEditingDescriptor.markdownToXml(markdown)
+        expect(result).toBe(xml)
+
+
     # test oddities
     it 'converts headers and oddities to xml', ->
       data = MarkdownEditingDescriptor.markdownToXml("""Not a header
