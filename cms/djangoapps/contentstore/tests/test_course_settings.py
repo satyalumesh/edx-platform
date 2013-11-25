@@ -9,10 +9,9 @@ import mock
 from django.utils.timezone import UTC
 from django.test.utils import override_settings
 
-from xmodule.modulestore import Location
 from models.settings.course_details import (CourseDetails, CourseSettingsEncoder)
 from models.settings.course_grading import CourseGradingModel
-from contentstore.utils import get_modulestore
+from contentstore.utils import get_modulestore, EXTRA_TAB_PANELS
 from xmodule.modulestore.tests.factories import CourseFactory
 
 
@@ -21,6 +20,7 @@ from xmodule.fields import Date
 
 from .utils import CourseTestCase
 from xmodule.modulestore.django import loc_mapper, modulestore
+from contentstore.views.component import ADVANCED_COMPONENT_POLICY_KEY
 
 
 class CourseDetailsTestCase(CourseTestCase):
@@ -419,7 +419,11 @@ class CourseMetadataEditingTest(CourseTestCase):
     def setUp(self):
         CourseTestCase.setUp(self)
         self.fullcourse = CourseFactory.create(org='edX', course='999', display_name='Robot Super Course')
-        self.fullcourse_location = Location(['i4x', 'edX', '999', 'course', 'Robot_Super_Course', None])
+        self.course_setting_url = self.course_locator.url_reverse('settings/advanced')
+        self.fullcourse_setting_url = loc_mapper().translate_location(
+            self.fullcourse.location.course_id,
+            self.fullcourse.location, False, True
+        ).url_reverse('settings/advanced')
 
     def test_fetch_initial_fields(self):
         test_model = CourseMetadata.fetch(self.course)
@@ -466,8 +470,10 @@ class CourseMetadataEditingTest(CourseTestCase):
         self.assertEqual(test_model['days_early_for_beta'], 2, "days_early_for_beta not expected value")
 
     def test_delete_key(self):
-        test_model = CourseMetadata.delete_key(
-            self.fullcourse, {'deleteKeys': ['doesnt_exist', 'showanswer', 'xqa_key']}
+        test_model = CourseMetadata.update_from_json(
+            self.fullcourse, {
+                "unsetKeys": ['showanswer', 'xqa_key']
+            }
         )
         # ensure no harm
         self.assertNotIn('graceperiod', test_model, 'blacklisted field leaked in')
@@ -477,6 +483,65 @@ class CourseMetadataEditingTest(CourseTestCase):
         # check for deletion effectiveness
         self.assertEqual('finished', test_model['showanswer'], 'showanswer field still in')
         self.assertEqual(None, test_model['xqa_key'], 'xqa_key field still in')
+
+    def test_http_fetch_initial_fields(self):
+        response = self.client.get_json(self.course_setting_url)
+        test_model = json.loads(response.content)
+        self.assertIn('display_name', test_model, 'Missing editable metadata field')
+        self.assertEqual(test_model['display_name'], 'Robot Super Course', "not expected value")
+
+        response = self.client.get_json(self.fullcourse_setting_url)
+        test_model = json.loads(response.content)
+        self.assertNotIn('graceperiod', test_model, 'blacklisted field leaked in')
+        self.assertIn('display_name', test_model, 'full missing editable metadata field')
+        self.assertEqual(test_model['display_name'], 'Robot Super Course', "not expected value")
+        self.assertIn('rerandomize', test_model, 'Missing rerandomize metadata field')
+        self.assertIn('showanswer', test_model, 'showanswer field ')
+        self.assertIn('xqa_key', test_model, 'xqa_key field ')
+
+    def test_http_update_from_json(self):
+        response = self.client.ajax_post(self.course_setting_url, {
+            "advertised_start": "start A",
+            "testcenter_info": {"c": "test"},
+            "days_early_for_beta": 2,
+            "unsetKeys": ['showanswer', 'xqa_key'],
+        })
+        test_model = json.loads(response.content)
+        self.update_check(test_model)
+        self.assertEqual('finished', test_model['showanswer'], 'showanswer field still in')
+        self.assertEqual(None, test_model['xqa_key'], 'xqa_key field still in')
+
+        response = self.client.get_json(self.course_setting_url)
+        test_model = json.loads(response.content)
+        self.update_check(test_model)
+        # now change some of the existing metadata
+        response = self.client.ajax_post(self.course_setting_url, {
+            "advertised_start": "start B",
+            "display_name": "jolly roger"
+        })
+        test_model = json.loads(response.content)
+        self.assertIn('display_name', test_model, 'Missing editable metadata field')
+        self.assertEqual(test_model['display_name'], 'jolly roger', "not expected value")
+        self.assertIn('advertised_start', test_model, 'Missing revised advertised_start metadata field')
+        self.assertEqual(test_model['advertised_start'], 'start B', "advertised_start not expected value")
+
+    def test_advanced_components_munge_tabs(self):
+        """
+        Test that adding and removing specific advanced components adds and removes tabs.
+        """
+        self.assertNotIn(EXTRA_TAB_PANELS.get("open_ended"), self.course.tabs)
+        self.assertNotIn(EXTRA_TAB_PANELS.get("notes"), self.course.tabs)
+        self.client.ajax_post(self.course_setting_url, {
+            ADVANCED_COMPONENT_POLICY_KEY: ["combinedopenended"]
+        })
+        course = modulestore().get_item(self.course_location)
+        self.assertIn(EXTRA_TAB_PANELS.get("open_ended"), course.tabs)
+        self.assertNotIn(EXTRA_TAB_PANELS.get("notes"), course.tabs)
+        self.client.ajax_post(self.course_setting_url, {
+            ADVANCED_COMPONENT_POLICY_KEY: []
+        })
+        course = modulestore().get_item(self.course_location)
+        self.assertNotIn(EXTRA_TAB_PANELS.get("open_ended"), course.tabs)
 
 
 class CourseGraderUpdatesTest(CourseTestCase):

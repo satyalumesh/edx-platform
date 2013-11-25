@@ -27,8 +27,7 @@ from xmodule.modulestore.exceptions import (
     ItemNotFoundError, InvalidLocationError)
 from xmodule.modulestore import Location
 
-from contentstore.course_info_model import (
-    get_course_updates, update_course_updates, delete_course_update)
+from contentstore.course_info_model import get_course_updates, update_course_updates, delete_course_update
 from contentstore.utils import (
     get_lms_link_for_item, add_extra_panel_tab, remove_extra_panel_tab,
     get_modulestore)
@@ -553,7 +552,7 @@ def _config_course_advanced_components(request, course_module):
 
 @login_required
 @ensure_csrf_cookie
-@require_http_methods(("GET", "POST", "PUT", "DELETE"))
+@require_http_methods(("GET", "POST", "PUT"))
 @expect_json
 def advanced_settings_handler(request, course_id=None, branch=None, version_guid=None, block=None, tag=None):
     """
@@ -563,10 +562,8 @@ def advanced_settings_handler(request, course_id=None, branch=None, version_guid
         json: get the model
     PUT, POST
         json: update the Course's settings. The payload is a json rep of the
-            metadata dicts
-    DELETE
-        json: unset the given fields. the payload is either a key or a list of
-            keys to delete.
+            metadata dicts. The dict can include a "unsetKeys" entry which is a list
+            of keys whose values to unset: i.e., revert to default
     """
     locator = BlockUsageLocator(course_id=course_id, branch=branch, version_guid=version_guid, usage_id=block)
     if not has_access(request.user, locator):
@@ -579,15 +576,12 @@ def advanced_settings_handler(request, course_id=None, branch=None, version_guid
 
         return render_to_response('settings_advanced.html', {
             'context_course': course_module,
-            'course_locator': locator,
             'advanced_dict': json.dumps(CourseMetadata.fetch(course_module)),
             'advanced_settings_url': locator.url_reverse('settings/advanced')
         })
     elif 'application/json' in request.META.get('HTTP_ACCEPT', ''):
         if request.method == 'GET':
             return JsonResponse(CourseMetadata.fetch(course_module))
-        elif request.method == 'DELETE':
-            return JsonResponse(CourseMetadata.delete_key(course_module, request.json))
         else:
             # Whether or not to filter the tabs key out of the settings metadata
             filter_tabs = _config_course_advanced_components(request, course_module)
@@ -599,7 +593,7 @@ def advanced_settings_handler(request, course_id=None, branch=None, version_guid
                 ))
             except (TypeError, ValueError) as err:
                 return HttpResponseBadRequest(
-                    "Incorrect setting format. " + str(err),
+                    "Incorrect setting format. {}".format(err),
                     content_type="text/plain"
                 )
 

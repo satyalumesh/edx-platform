@@ -20,7 +20,9 @@ class CourseMetadata(object):
                      'tabs',
                      'graceperiod',
                      'checklists',
-                     'show_timezone'
+                     'show_timezone',
+                     'format',
+                     'graded',
     ]
 
     @classmethod
@@ -65,6 +67,11 @@ class CourseMetadata(object):
             if key in filtered_list:
                 continue
 
+            if key == "unsetKeys":
+                dirty = True
+                for unset in val:
+                    descriptor.fields[unset].delete_from(descriptor)
+
             if hasattr(descriptor, key) and getattr(descriptor, key) != val:
                 dirty = True
                 value = descriptor.fields[key].from_json(val)
@@ -72,18 +79,5 @@ class CourseMetadata(object):
 
         if dirty:
             get_modulestore(descriptor.location).update_metadata(descriptor.location, own_metadata(descriptor))
-
-        return cls.fetch(descriptor)
-
-    @classmethod
-    def delete_key(cls, descriptor, payload):
-        '''
-        Remove the given metadata key(s) from the course. payload is a list of keys: [key..]
-        '''
-        for key in payload['deleteKeys']:
-            if hasattr(descriptor, key):
-                delattr(descriptor, key)
-
-        get_modulestore(descriptor.location).update_metadata(descriptor.location, own_metadata(descriptor))
 
         return cls.fetch(descriptor)
