@@ -5,7 +5,7 @@ Feature: LMS.Instructor Dash Bulk Email
     I want to send email to staff and students in a course.
 
     Scenario: Send bulk email
-    Given I am "<Role>" for a course
+    Given I am a "<Role>" for a course
     When I send email to "<Recipient>"
     Then Email is sent to "<Recipient>"
 
