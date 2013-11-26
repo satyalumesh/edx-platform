@@ -189,6 +189,7 @@ class @StaffGrading
     $(window).keyup @keyup_handler
     @question_header = $('.question-header')
     @question_header.click @collapse_question
+    @collapse_question()
 
     # model state
     @state = state_no_data
