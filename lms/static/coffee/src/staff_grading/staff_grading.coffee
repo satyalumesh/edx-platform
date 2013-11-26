@@ -450,7 +450,7 @@ class @StaffGrading
       @set_button_text(gettext('Re-check for submissions'))
 
     else
-      @error(gettext('System got into invalid state ') + @state)
+      @error(_.template(gettext('System got into invalid state: <%= state %>'), {state: @state}))
 
     @submit_button.toggle(show_submit_button)
     @action_button.toggle(show_action_button)
