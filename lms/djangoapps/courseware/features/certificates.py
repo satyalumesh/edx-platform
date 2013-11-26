@@ -10,7 +10,7 @@ UPSELL_LINK_CSS = '.message-upsell a.action-upgrade[href*="edx/999/Certificates"
 
 def create_cert_course():
     world.clear_courses()
-    org = 'edx'
+    org = 'edx'  
     number = '999'
     name = 'Certificates'
     course_id = '{org}/{number}/{name}'.format(
