@@ -8,7 +8,7 @@ the following:
 rake django-admin[anonymized_id_mapping,x,y,z]
 
 [Naturally, substitute the appropriate values for x, y, and z. (I.e.,
- lms, dev, and MITx/6.002x/Circuits)]"""
+ lms, dev, and edX/6.002x/Circuits)]"""
 
 import csv
 
