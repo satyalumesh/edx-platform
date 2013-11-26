@@ -28,7 +28,7 @@ from courseware.tests.tests import TEST_DATA_MIXED_MODULESTORE
 from mock import Mock, patch, sentinel
 from textwrap import dedent
 
-from student.models import unique_id_for_user, CourseEnrollment, UserMethods
+from student.models import unique_id_for_user, CourseEnrollment
 from student.views import (process_survey_link, _cert_info, password_reset, password_reset_confirm_wrapper,
                            change_enrollment, complete_course_mode_info)
 from student.tests.factories import UserFactory, CourseModeFactory
@@ -327,14 +327,7 @@ class EnrollInCourseTest(TestCase):
             user=user,
             course_id=course_id
         )
-
-    def test_user_emitted_events(self):
-        user = User.objects.create_user("joe", "joe@joe.com", "password")
-        course_id = "edX/Test101/2013"
-        course_id_partial = "edX/Test101"
-        with patch('eventtracking.tracker.get_tracker', side_effect=Exception):
-            UserMethods.emit_event(user, course_id, "fake")
-        self.assertTrue(True)
+        self.assertFalse(enrollment_record.is_active)
 
     def assert_no_events_were_emitted(self):
         """Ensures no events were emitted since the last event related assertion"""
