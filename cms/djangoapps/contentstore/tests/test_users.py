@@ -145,18 +145,6 @@ class UsersTestCase(CourseTestCase):
         self.assertIn("error", result)
         self.assert_not_enrolled()
 
-    def test_detail_post_bad_json(self):
-        resp = self.client.post(
-            self.detail_url,
-            data="{foo}",
-            content_type="application/json",
-            HTTP_ACCEPT="application/json",
-        )
-        self.assertEqual(resp.status_code, 400)
-        result = json.loads(resp.content)
-        self.assertIn("error", result)
-        self.assert_not_enrolled()
-
     def test_detail_post_no_json(self):
         resp = self.client.post(
             self.detail_url,

@@ -1,3 +1,6 @@
+"""
+Studio authorization functions primarily for course creators, instructors, and staff
+"""
 #=======================================================================================================================
 #
 # This code is somewhat duplicative of access.py in the LMS. We will unify the code as a separate story
@@ -27,9 +30,9 @@ COURSE_CREATOR_GROUP_NAME = "course_creator_group"
 # of those two variables
 
 
-def get_all_course_groupnames_for_role(location, role, use_filter=True):
+def get_all_course_role_groupnames(location, role, use_filter=True):
     '''
-    Get all of the possible groupnames for this role location pair. If use_filter==True, 
+    Get all of the possible groupnames for this role location pair. If use_filter==True,
     only return the ones defined in the groups collection.
     '''
     location = Locator.to_locator_or_location(location)
@@ -72,15 +75,15 @@ def get_course_groupname_for_role(location, role):
     * role_old_course_id (e.g., staff_myu/mycourse/myrun)
     * role_old_course (e.g., staff_mycourse)
     '''
-    groupnames, default = get_all_course_groupnames_for_role(location, role)
+    groupnames, default = get_all_course_role_groupnames(location, role)
     return groupnames[0] if groupnames else default
 
 
-def get_users_in_course_group_by_role(course_locator, role):
+def get_course_role_users(course_locator, role):
     '''
     Get all of the users with the given role in the given course.
     '''
-    groupnames, _ = get_all_course_groupnames_for_role(course_locator, role)
+    groupnames, _ = get_all_course_role_groupnames(course_locator, role)
     groups = [Group.objects.get(name=groupname) for groupname in groupnames]
     return [user for user in itertools.chain.from_iterable([group.user_set.all() for group in groups])]
 
@@ -97,7 +100,7 @@ def create_new_course_group(creator, location, role):
     '''
     Create the new course group always using the preferred name even if another form already exists.
     '''
-    groupnames, _ = get_all_course_groupnames_for_role(location, role, use_filter=False)
+    groupnames, _ = get_all_course_role_groupnames(location, role, use_filter=False)
     (group, _) = Group.objects.get_or_create(name=groupnames[0])
     creator.groups.add(group)
     creator.save()
@@ -112,7 +115,7 @@ def _delete_course_group(location):
     """
     # remove all memberships
     for role in [INSTRUCTOR_ROLE_NAME, STAFF_ROLE_NAME]:
-        groupnames, _ = get_all_course_groupnames_for_role(location, role)
+        groupnames, _ = get_all_course_role_groupnames(location, role)
         for groupname in groupnames:
             group = Group.objects.get(name=groupname)
             for user in group.user_set.all():
@@ -126,7 +129,7 @@ def _copy_course_group(source, dest):
     asserted permissions to do this action
     """
     for role in [INSTRUCTOR_ROLE_NAME, STAFF_ROLE_NAME]:
-        groupnames, _ = get_all_course_groupnames_for_role(source, role)
+        groupnames, _ = get_all_course_role_groupnames(source, role)
         for groupname in groupnames:
             group = Group.objects.get(name=groupname)
             new_group, _ = Group.objects.get_or_create(name=get_course_groupname_for_role(dest, INSTRUCTOR_ROLE_NAME))
@@ -136,6 +139,9 @@ def _copy_course_group(source, dest):
 
 
 def add_user_to_course_group(caller, user, location, role):
+    """
+    If caller is authorized, add the given user to the given course's role
+    """
     # only admins can add/remove other users
     if not is_user_in_course_group_role(caller, location, INSTRUCTOR_ROLE_NAME):
         raise PermissionDenied
@@ -174,6 +180,9 @@ def _add_user_to_group(user, group):
 
 
 def get_user_by_email(email):
+    """
+    Get the user whose email is the arg. Return None if no such user exists.
+    """
     user = None
     # try to look up user, return None if not found
     try:
@@ -185,12 +194,15 @@ def get_user_by_email(email):
 
 
 def remove_user_from_course_group(caller, user, location, role):
+    """
+    If caller is authorized, remove the given course x role authorization for user
+    """
     # only admins can add/remove other users
     if not is_user_in_course_group_role(caller, location, INSTRUCTOR_ROLE_NAME):
         raise PermissionDenied
 
     # see if the user is actually in that role, if not then we don't have to do anything
-    groupnames, _ = get_all_course_groupnames_for_role(location, role)
+    groupnames, _ = get_all_course_role_groupnames(location, role)
     for groupname in groupnames:
         groups = user.groups.filter(name=groupname)
         if groups:
@@ -222,11 +234,15 @@ def _remove_user_from_group(user, group_name):
 
 
 def is_user_in_course_group_role(user, location, role, check_staff=True):
+    """
+    Check whether the given user has the given role in this course. If check_staff
+    then give permission if the user is staff without doing a course-role query.
+    """
     if user.is_active and user.is_authenticated:
         # all "is_staff" flagged accounts belong to all groups
         if check_staff and user.is_staff:
             return True
-        groupnames, _ = get_all_course_groupnames_for_role(location, role)
+        groupnames, _ = get_all_course_role_groupnames(location, role)
         for groupname in groupnames:
             if user.groups.filter(name=groupname).exists():
                 return True

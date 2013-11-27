@@ -50,7 +50,7 @@ class TestCourseAccess(ModuleStoreTestCase):
             self.course_location.course_id, self.course_location, False, True
         )
         self.client.ajax_post(
-            self.course_locator.url_reverse('course'), 
+            self.course_locator.url_reverse('course'),
             {
                 'org': self.course_location.org, 
                 'number': self.course_location.course,
@@ -99,7 +99,7 @@ class TestCourseAccess(ModuleStoreTestCase):
         # add the misc users to the course in different groups
         for role in [INSTRUCTOR_ROLE_NAME, STAFF_ROLE_NAME]:
             user_by_role[role] = []
-            groupnames, _ = authz.get_all_course_groupnames_for_role(self.course_locator, role)
+            groupnames, _ = authz.get_all_course_role_groupnames(self.course_locator, role)
             for groupname in groupnames:
                 group, _ = Group.objects.get_or_create(name=groupname)
                 user = users.pop()
@@ -113,3 +113,15 @@ class TestCourseAccess(ModuleStoreTestCase):
         for role in [INSTRUCTOR_ROLE_NAME, STAFF_ROLE_NAME]:
             for user in user_by_role[role]:
                 self.assertContains(response, user.email)
+        
+        # test copying course permissions
+        copy_course_location = Location(['i4x', 'copyu', 'copydept.mycourse', 'course', 'myrun'])
+        copy_course_locator = loc_mapper().translate_location(
+            copy_course_location.course_id, copy_course_location, False, True
+        )
+        # pylint: disable=protected-access
+        authz._copy_course_group(self.course_locator, copy_course_locator)
+        for role in [INSTRUCTOR_ROLE_NAME, STAFF_ROLE_NAME]:
+            for user in user_by_role[role]:
+                self.assertTrue(has_access(user, copy_course_locator), "{} no copy access".format(user))
+                self.assertTrue(has_access(user, copy_course_location), "{} no copy access".format(user))

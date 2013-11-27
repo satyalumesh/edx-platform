@@ -9,10 +9,10 @@ from django_future.csrf import ensure_csrf_cookie
 from mitxmako.shortcuts import render_to_response
 
 from xmodule.modulestore.django import modulestore, loc_mapper
-from util.json_request import JsonResponse
+from util.json_request import JsonResponse, expect_json
 from auth.authz import (
-    STAFF_ROLE_NAME, INSTRUCTOR_ROLE_NAME, get_course_groupname_for_role, 
-    get_users_in_course_group_by_role
+    STAFF_ROLE_NAME, INSTRUCTOR_ROLE_NAME, get_course_groupname_for_role,
+    get_course_role_users
 )
 from course_creators.views import user_requested_access
 
@@ -36,6 +36,7 @@ def request_course_creator(request):
     return JsonResponse({"Status": "OK"})
 
 
+# pylint: disable=unused-argument
 @login_required
 @ensure_csrf_cookie
 @require_http_methods(("GET", "POST", "PUT", "DELETE"))
@@ -74,9 +75,9 @@ def _manage_users(request, locator):
         raise PermissionDenied()
 
     course_module = modulestore().get_item(old_location)
-    instructors = get_users_in_course_group_by_role(locator, INSTRUCTOR_ROLE_NAME)
+    instructors = get_course_role_users(locator, INSTRUCTOR_ROLE_NAME)
     # the page only lists staff and assumes they're a superset of instructors. Do a union to ensure.
-    staff = set(get_users_in_course_group_by_role(locator, STAFF_ROLE_NAME)).union(instructors)
+    staff = set(get_course_role_users(locator, STAFF_ROLE_NAME)).union(instructors)
 
     return render_to_response('manage_users.html', {
         'context_course': course_module,
@@ -86,7 +87,11 @@ def _manage_users(request, locator):
     })
 
 
+@expect_json
 def _course_team_user(request, locator, email):
+    """
+    Handle the add, remove, promote, demote requests ensuring the requester has authority
+    """
     # check that logged in user has permissions to this item
     if has_access(request.user, locator, role=INSTRUCTOR_ROLE_NAME):
         # instructors have full permissions
@@ -160,19 +165,9 @@ def _course_team_user(request, locator, email):
         return JsonResponse()
 
     # all other operations require the requesting user to specify a role
-    if request.META.get("CONTENT_TYPE", "").startswith("application/json") and request.body:
-        try:
-            payload = json.loads(request.body)
-        except:
-            return JsonResponse({"error": _("malformed JSON")}, 400)
-        try:
-            role = payload["role"]
-        except KeyError:
-            return JsonResponse({"error": _("`role` is required")}, 400)
-    else:
-        if not "role" in request.POST:
-            return JsonResponse({"error": _("`role` is required")}, 400)
-        role = request.POST["role"]
+    role = request.json.get("role", request.POST.get("role"))
+    if role is None:
+        return JsonResponse({"error": _("`role` is required")}, 400)
 
     old_location = loc_mapper().translate_locator_to_location(locator)
     if role == "instructor":
@@ -202,4 +197,3 @@ def _course_team_user(request, locator, email):
         CourseEnrollment.enroll(user, old_location.course_id)
 
     return JsonResponse()
-
