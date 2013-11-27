@@ -235,21 +235,23 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
       // replace string and numerical
       xml = xml.replace(/(^\=\s*(.*?$)(\n*or\=\s*(.*?$))*)+/gm, function(match, p) {
         var string,
-            mathRegExp = /^\\\((.*)\\\)$/, // Catch \( ... \)
+            mathRegExp = /^\\\((.+)\\\)$/, // Catch \( ... \)
             answersList = p.replace(/^(or)?=\s*/gm, '').split('\n'),
             floatValue = parseFloat(answersList[0]),
-            mathValue = mathRegExp.exec(answersList[0].trim());
+            mathValue = mathRegExp.exec(answersList[0].replace(/\s+/g,''));
 
         // Returns ranges for formularesponse.
         // If len = 3, it returns string '-10,-10,-10:10,10,10'.
         var getRanges = function(len) {
-          var start = [], end = [];
+          var start = [], end = [],
+              separator = ':';
+
           while (len--) {
             start.push('-10');
             end.push('10');
           }
 
-          return start.join(',') + ':' + end.join(',')
+          return start.join(',') + separator + end.join(',')
         };
         if(!isNaN(floatValue)) {
           // NumericalResponse
@@ -266,8 +268,8 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
 
         } else if(mathValue) {
           var answer = mathValue[1],
-              varsRegExp = /[A-Za-z_]+\d*/g,
-              varsList = answer.match(varsRegExp),
+              varsRegExp = /[A-Za-z_$]+\d*/g,
+              varsList = _.uniq(answer.match(varsRegExp)),
               ranges = getRanges(varsList.length);
 
           string = '<formularesponse type="ci" samples="' + varsList.join(',') + '@' + ranges + '#10" answer="' + answer + '">\n'
