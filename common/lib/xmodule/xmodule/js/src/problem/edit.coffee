@@ -162,7 +162,7 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
     return MarkdownEditingDescriptor.insertGenericInput(selectedText, '= ', '', MarkdownEditingDescriptor.numberInputTemplate)
 
   @insertMathInput: (selectedText) ->
-    return MarkdownEditingDescriptor.insertGenericInput(selectedText, '= ', '', MarkdownEditingDescriptor.mathInputTemplate)
+    return MarkdownEditingDescriptor.insertGenericInput(selectedText, '= \\(', '\\)', MarkdownEditingDescriptor.mathInputTemplate)
 
   @insertSelect: (selectedText) ->
     return MarkdownEditingDescriptor.insertGenericInput(selectedText, '[[', ']]', MarkdownEditingDescriptor.selectTemplate)
@@ -232,16 +232,64 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
         return groupString;
       });
 
-      // replace string and numerical
-      xml = xml.replace(/(^\=\s*(.*?$)(\n*or\=\s*(.*?$))*)+/gm, function(match, p) {
-        var string,
-            mathRegExp = /^\\\((.+)\\\)$/, // Catch \( ... \)
-            answersList = p.replace(/^(or)?=\s*/gm, '').split('\n'),
-            floatValue = parseFloat(answersList[0]),
-            mathValue = mathRegExp.exec(answersList[0].replace(/\s+/g,''));
+// replace string and numerical, formularesponse
+    xml = xml.replace(/(^\=\s*(.*?$)(\n*or\=\s*(.*?$))*)+/gm, function(match, p) {
+      // Split answers
+      var answersList = p.replace(/^(or)?=\s*/gm, '').split('\n');
+
+      var processNumericalResponse = function (value) {
+        var floatValue = parseFloat(value),
+            params, string;
+
+        if (!isFinite(floatValue)) {
+          return false;
+        }
+
+        params = /(.*?)\+\-\s*(.*?$)/.exec(value);
+        if(params) {
+          string = '<numericalresponse answer="' + floatValue + '">\n';
+          string += '  <responseparam type="tolerance" default="' + params[2] + '" />\n';
+        } else {
+          string = '<numericalresponse answer="' + floatValue + '">\n';
+        }
+
+        string += '  <formulaequationinput />\n';
+        string += '</numericalresponse>\n\n';
+
+        return string;
+      };
+
+      var processFormulaResponse = function (value) {
+        // Handles variables passed in. They must start with
+        // letters/underscores/$ and may contain numbers afterward.
+        var varsRegExp = /[A-Za-z_]+\d*/g,
+            // Catches suffixes.
+            suffixesRegExp = /(\d+[A-Za-z%]+)/g,
+            // Catches \( ... \)
+            mathRegExp = /^\\\((.+)\\\)$/,
+            answer = mathRegExp.exec(value.replace(/\s+/g,'')),
+            varsList;
+
+        if (!answer) {
+          return false;
+        } else {
+          answer = answer[1];
+        }
+
+        // Gets a list of unique variables.
+        varsList = _.uniq(
+          // Cleans answer from suffixes.
+          answer.replace(suffixesRegExp, '')
+                .match(varsRegExp)
+        );
+
+        if (!varsList.length) {
+          return false;
+        }
 
         // Returns ranges for formularesponse.
-        // If len = 3, it returns string '-10,-10,-10:10,10,10'.
+        // If len=3, it returns string '-10,-10,-10:10,10,10'.
+        // If len=0 server-side error occurs.
         var getRanges = function(len) {
           var start = [], end = [],
               separator = ':';
@@ -253,42 +301,32 @@ class @MarkdownEditingDescriptor extends XModule.Descriptor
 
           return start.join(',') + separator + end.join(',')
         };
-        if(!isNaN(floatValue)) {
-          // NumericalResponse
 
-          var params = /(.*?)\+\-\s*(.*?$)/.exec(answersList[0]);
-          if(params) {
-            string = '<numericalresponse answer="' + floatValue + '">\n';
-            string += '  <responseparam type="tolerance" default="' + params[2] + '" />\n';
-          } else {
-            string = '<numericalresponse answer="' + floatValue + '">\n';
-          }
-          string += '  <formulaequationinput />\n';
-          string += '</numericalresponse>\n\n';
 
-        } else if(mathValue) {
-          var answer = mathValue[1],
-              varsRegExp = /[A-Za-z_$]+\d*/g,
-              varsList = _.uniq(answer.match(varsRegExp)),
-              ranges = getRanges(varsList.length);
+        return [
+          '<formularesponse type="ci" ',
+          'samples="', varsList.join(','), '@', getRanges(varsList.length), '#10" ',
+          'answer="', answer,
+          '">\n',
+          '  <responseparam type="tolerance" default="0.00001"/>\n',
+          '  <formulaequationinput size="40" />\n',
+          '</formularesponse>\n\n'
+        ].join('');
+      };
 
-          string = '<formularesponse type="ci" samples="' + varsList.join(',') + '@' + ranges + '#10" answer="' + answer + '">\n'
-          string += '  <responseparam type="tolerance" default="0.00001"/>\n'
-          string += '  <formulaequationinput size="40" />\n'
-          string += '</formularesponse>\n\n'
+      var processStringResponse = function (value) {
+        return [
+          '<stringresponse ',
+          'answer="', value.join('_or_'), '" ',
+          'type="ci">\n',
+          '  <textline size="20"/>\n',
+          '</stringresponse>\n\n'
+        ].join('');
+      };
 
-        } else {
-            // StringResponse
-
-            var answers = [];
-
-            for(var i = 0; i < answersList.length; i++) {
-                answers.push(answersList[i])
-            }
-
-            string = '<stringresponse answer="' + answers.join('_or_') + '" type="ci">\n  <textline size="20"/>\n</stringresponse>\n\n';
-        }
-        return string;
+      return processNumericalResponse(answersList[0]) ||
+             processFormulaResponse(answersList[0]) ||
+             processStringResponse(answersList);
     });
 
       // replace selects

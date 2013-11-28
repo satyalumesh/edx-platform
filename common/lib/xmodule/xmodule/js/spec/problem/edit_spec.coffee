@@ -62,6 +62,14 @@ describe 'MarkdownEditingDescriptor', ->
       revisedSelection = MarkdownEditingDescriptor.insertNumberInput('my text')
       expect(revisedSelection).toEqual('= my text')
 
+  describe 'insertMathInput', ->
+    it 'inserts the template if selection is empty', ->
+      revisedSelection = MarkdownEditingDescriptor.insertMathInput('')
+      expect(revisedSelection).toEqual(MarkdownEditingDescriptor.mathInputTemplate)
+    it 'wraps existing text', ->
+      revisedSelection = MarkdownEditingDescriptor.insertMathInput('my text')
+      expect(revisedSelection).toEqual('= \\(my text\\)')
+
   describe 'insertSelect', ->
     it 'inserts the template if selection is empty', ->
       revisedSelection = MarkdownEditingDescriptor.insertSelect('')
@@ -315,13 +323,13 @@ describe 'MarkdownEditingDescriptor', ->
 
       caseDict = [
         {
-          markdown: '''= \\( a + $b + _c + d1 + e_$2 \\)'''
-          answer: 'a+$b+_c+d1+e_$2',
-          samples: 'a,$b,_c,d1,e_$2@-10,-10,-10,-10,-10:10,10,10,10,10#10'
+          markdown: '''= \\( a + $b + _c + d1 \\)'''
+          answer: 'a+$b+_c+d1',
+          samples: 'a,b,_c,d1@-10,-10,-10,-10:10,10,10,10#10'
         },
         {
-          markdown: '''= \\(m*c^2\\)'''
-          answer: 'm*c^2',
+          markdown: '''= \\(m*c^2 + .34\\)'''
+          answer: 'm*c^2+.34',
           samples: 'm,c@-10,-10:10,10#10'
         },
         {
@@ -349,9 +357,9 @@ describe 'MarkdownEditingDescriptor', ->
         },
         # DEFAULT SUFFIXES
         {
-          markdown: '''= \\(x + 5k + 10k * 10%\\)'''
-          answer: 'x+5k+10k*10%',
-          samples: 'x,k@-10,-10:10,10#10'
+          markdown: '''= \\( x+5k+10k*10%+ 1e3%+99k+1%-20e-49+_c+10*k+$4-x10\\)'''
+          answer: 'x+5k+10k*10%+1e3%+99k+1%-20e-49+_c+10*k+$4-x10',
+          samples: 'x,_c,k,x10@-10,-10,-10,-10:10,10,10,10#10'
         },
         # DEFAULT FUNCTIONS
         {
@@ -363,6 +371,11 @@ describe 'MarkdownEditingDescriptor', ->
           markdown: '''= \\(factorial(10)\\)'''
           answer: 'factorial(10)',
           samples: 'factorial@-10:10#10'
+        },
+        {
+          markdown: '''= \\(log2(4)\\)'''
+          answer: 'log2(4)',
+          samples: 'log2@-10:10#10'
         }
       ]
 
